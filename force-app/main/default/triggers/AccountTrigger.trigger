@@ -38,28 +38,16 @@ trigger AccountTrigger on Account (before insert, after insert) {
         * Trigger should only fire on insert.
         */
         
-        AccountHelper.setRating(Trigger.new);
-    }  
-    
+        AccountHelper.setRating(Trigger.new);        
+    }   
 
-    
-    /*
-    * Account Trigger
+    /* Account Trigger
     * When an account is inserted create a contact related to the account with the following default values:
     * LastName = 'DefaultContact'
     * Email = 'default@email.com'
-    * Trigger should only fire on insert.
+    * Trigger should only fire on insert.*/
       
     if(Trigger.isAfter && Trigger.isInsert){     
-        List<Contact> contacts = new List<Contact>();   
-        for(Account acc : Trigger.new){
-            Contact con = new Contact();
-            con.LastName = 'DefaultContact';
-            con.Email = 'default@email.com';
-            con.AccountId = acc.Id;
-            contacts.add(con);
-        }
-        insert contacts; 
+        AccountHelper.defaultContact(Trigger.new);
     }
-        */
 }

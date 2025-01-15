@@ -75,7 +75,19 @@ public with sharing class AccountHelper {
         }
     }
 
-    //[public | private ] [static] data_type defaultContact (input parameters) {
-    //  The body of the method
-    //}
+    public static void defaultContact(List<Account> accRecords) {
+        
+        List<Contact> contacts = new List<Contact>();   
+        for(Account tempAcc : accRecords){
+            Contact con = new Contact();
+            con.LastName = 'DefaultContact';
+            con.Email = 'default@email.com';
+            con.AccountId = tempAcc.Id;
+            contacts.add(con);
+        }
+        
+        if(!contacts.isEmpty()){
+            insert contacts; 
+        }
+    }
 }
