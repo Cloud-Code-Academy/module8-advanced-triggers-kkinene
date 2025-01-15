@@ -28,17 +28,52 @@ Always ensure that your helper methods are bulk-safe to handle multiple records 
 */
 public with sharing class AccountHelper {
     
-    public void setTypeProspect(SObject objects){
+    //"static" allows us to call the method without creating an instance of the helper calls
+    public static void setTypeProspect(List<Account> accRecords){
+        //Make sure the list is not  empty
+        if(accRecords == null || accRecords.isEmpty()){
+            return;
+        }
 
+        for(Account tempAcc : accRecords){
+            if(String.isBlank(tempAcc.Type)){
+                tempAcc.Type = 'Prospect';
+            }
+        }
     }
 
-    void addressCopy(){
+    public static void addressCopy(List<Account> accRecords){
+        for(Account tempAcc : accRecords){
 
+            if (tempAcc.ShippingStreet != null) {
+                tempAcc.BillingStreet = tempAcc.ShippingStreet;
+            }
+
+            if (tempAcc.ShippingCity != null) {
+                tempAcc.BillingCity = tempAcc.ShippingCity;
+            }
+
+            if (tempAcc.ShippingState != null) {
+                tempAcc.BillingState = tempAcc.ShippingState;
+            }
+
+            if (tempAcc.ShippingPostalCode != null) {
+                tempAcc.BillingPostalCode = tempAcc.ShippingPostalCode;
+            }
+
+            if (tempAcc.ShippingCountry != null) {
+                tempAcc.BillingCountry = tempAcc.ShippingCountry;
+            }
+        }             
     }
 
-    //[public | private ] [static] data_type setRating (input parameters) {
-    //  The body of the method
-    //}
+    public static void setRating(List<Account> accRecords){
+        for(Account tempAcc: accRecords){  
+            if (tempAcc.Phone != null && tempAcc.Website != null && tempAcc.Fax != null) {
+                tempAcc.Rating = 'Hot';
+            }            
+        }
+    }
 
     //[public | private ] [static] data_type defaultContact (input parameters) {
     //  The body of the method
