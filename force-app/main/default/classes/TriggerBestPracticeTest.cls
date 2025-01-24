@@ -618,6 +618,9 @@ public with sharing class TriggerBestPracticeTest {
 
         insert contactsToInsert;
         insert opportunitiesToInsert;
+        
+        // To prevent recursion in the trigger, use a static variable to control trigger execution
+        OpportunityHelper.isTriggerExecuted = true;  // Reset static flag before running the update
 
         for (Opportunity opp : opportunitiesToInsert) {
             opp.Primary_Contact__c = null;

@@ -39,6 +39,7 @@ trigger AnotherOpportunityTrigger on Opportunity (before insert, after insert, b
     if (Trigger.isAfter){
         if (Trigger.isInsert){
             // Create a new Task for newly inserted Opportunities
+            List <Task> taskList  = new List <Task>();
             for (Opportunity opp : Trigger.new){
                 Task tsk = new Task();
                 tsk.Subject = 'Call Primary Contact';
@@ -46,18 +47,32 @@ trigger AnotherOpportunityTrigger on Opportunity (before insert, after insert, b
                 tsk.WhoId = opp.Primary_Contact__c;
                 tsk.OwnerId = opp.OwnerId;
                 tsk.ActivityDate = Date.today().addDays(3);
-                insert tsk;
+                taskList.add(tsk);
+            }
+            if(!taskList.isEmpty()){
+                insert taskList;
             }
         } else if (Trigger.isUpdate){
-            // Append Stage changes in Opportunity Description
-            for (Opportunity opp : Trigger.new){
-                for (Opportunity oldOpp : Trigger.old){
-                    if (opp.StageName != null){
+            // Check the static variable to prevent recursion
+            if (!OpportunityHelper.isTriggerExecuted) {
+                OpportunityHelper.isTriggerExecuted = true; // Set the flag
+                // Append Stage changes in Opportunity Description
+                for (Opportunity opp : Trigger.new){
+                    //for (Opportunity oldOpp : Trigger.old){
+                    //Assign the old record to oldOpp
+                    Opportunity oldOpp = Trigger.oldMap.get(opp.Id);
+                    if(opp.Description == null){
+                        //Ensure description is not null to avoid execution error
+                        opp.Description = '';
+                    } 
+                    if (opp.StageName != null && opp.StageName != oldOpp.StageName){
                         opp.Description += '\n Stage Change:' + opp.StageName + ':' + DateTime.now().format();
-                    }
-                }                
+                    } 
+                }  
+            
+                update Trigger.new;
             }
-            update Trigger.new;
+            
         }
         // Send email notifications when an Opportunity is deleted 
         else if (Trigger.isDelete){
@@ -75,22 +90,39 @@ trigger AnotherOpportunityTrigger on Opportunity (before insert, after insert, b
     - Uses Salesforce's Messaging.SingleEmailMessage to send the email.
     */
     private static void notifyOwnersOpportunityDeleted(List<Opportunity> opps) {
+        // Collect all owner IDs
+        Set<Id> ownerIds = new Set<Id>();
+        for (Opportunity opp : opps) {
+            if (opp.OwnerId != null) {
+                ownerIds.add(opp.OwnerId);
+            }
+        }
+    
+        // Query Users with OwnerId
+        Map<Id, User> ownerIdToUserMap = new Map<Id, User>(
+            [SELECT Id, Email FROM User WHERE Id IN :ownerIds]
+        );
+    
+        // Create email messages
         List<Messaging.SingleEmailMessage> mails = new List<Messaging.SingleEmailMessage>();
-        for (Opportunity opp : opps){
-            Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
-            String[] toAddresses = new String[] {[SELECT Id, Email FROM User WHERE Id = :opp.OwnerId].Email};
-            mail.setToAddresses(toAddresses);
-            mail.setSubject('Opportunity Deleted : ' + opp.Name);
-            mail.setPlainTextBody('Your Opportunity: ' + opp.Name +' has been deleted.');
-            mails.add(mail);
-        }        
-        
+        for (Opportunity opp : opps) {
+            User owner = ownerIdToUserMap.get(opp.OwnerId);
+            if (owner != null) {
+                Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
+                mail.setToAddresses(new String[] { owner.Email });
+                mail.setSubject('Opportunity Deleted : ' + opp.Name);
+                mail.setPlainTextBody('Your Opportunity: ' + opp.Name + ' has been deleted.');
+                mails.add(mail);
+            }
+        }
+    
         try {
             Messaging.sendEmail(mails);
-        } catch (Exception e){
+        } catch (Exception e) {
             System.debug('Exception: ' + e.getMessage());
         }
     }
+    
 
     /*
     assignPrimaryContact:
