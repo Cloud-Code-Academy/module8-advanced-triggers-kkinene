@@ -129,16 +129,38 @@ trigger AnotherOpportunityTrigger on Opportunity (before insert, after insert, b
     - Assigns a primary contact with the title of 'VP Sales' to undeleted Opportunities.
     - Only updates the Opportunities that don't already have a primary contact.
     */
-    private static void assignPrimaryContact(Map<Id,Opportunity> oppNewMap) {        
+    private static void assignPrimaryContact(Map<Id, Opportunity> oppNewMap) {
+        // Collect all AccountIds from the opportunities
+        Set<Id> accountIds = new Set<Id>();
+        for (Opportunity opp : oppNewMap.values()) {
+            if (opp.AccountId != null) {
+                accountIds.add(opp.AccountId);
+            }
+        }
+    
+        // Query all relevant contacts upfront
+        Map<Id, Contact> accountToPrimaryContactMap = new Map<Id, Contact>();
+        for (Contact contact : [
+            SELECT Id, AccountId 
+            FROM Contact 
+            WHERE Title = 'VP Sales' AND AccountId IN :accountIds
+        ]) {
+            accountToPrimaryContactMap.put(contact.AccountId, contact);
+        }
+    
+        // Prepare the opportunities to update
         Map<Id, Opportunity> oppMap = new Map<Id, Opportunity>();
-        for (Opportunity opp : oppNewMap.values()){            
-            Contact primaryContact = [SELECT Id, AccountId FROM Contact WHERE Title = 'VP Sales' AND AccountId = :opp.AccountId LIMIT 1];
-            if (opp.Primary_Contact__c == null){
+        for (Opportunity opp : oppNewMap.values()) {
+            if (opp.Primary_Contact__c == null && accountToPrimaryContactMap.containsKey(opp.AccountId)) {
                 Opportunity oppToUpdate = new Opportunity(Id = opp.Id);
-                oppToUpdate.Primary_Contact__c = primaryContact.Id;
+                oppToUpdate.Primary_Contact__c = accountToPrimaryContactMap.get(opp.AccountId).Id;
                 oppMap.put(opp.Id, oppToUpdate);
             }
         }
-        update oppMap.values();
+    
+        // Perform the update if there are any changes
+        if (!oppMap.isEmpty()) {
+            update oppMap.values();
+        }
     }
 }

@@ -459,6 +459,8 @@ public with sharing class TriggerBestPracticeTest {
 
         delete oppsToInsert;        
         
+        // To prevent recursion in the trigger, use a static variable to control trigger execution
+        OpportunityHelper.isTriggerExecuted = true;
         undelete oppsToInsert; 
 
         Test.startTest();
