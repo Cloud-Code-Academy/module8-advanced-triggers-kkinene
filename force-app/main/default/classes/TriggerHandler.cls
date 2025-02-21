@@ -18,6 +18,9 @@ public virtual class TriggerHandler {
 
     // List of handler names that should not be executed
     private static Set<String> bypassedHandlers;
+
+    // Static set to track processed records to prevent recursion
+    private static Set<Id> processedRecords;
     
     // Represents the current context in which the trigger is executing (e.g., before insert, after update, etc.)
     @TestVisible
@@ -31,6 +34,7 @@ public virtual class TriggerHandler {
     static {
       loopCountMap = new Map<String, LoopCount>();
       bypassedHandlers = new Set<String>();
+      processedRecords = new Set<Id>();
     }
     
     // Constructor initializes the trigger context
@@ -78,6 +82,9 @@ public virtual class TriggerHandler {
           this.afterUndelete();
           }
       }
+
+      // Mark records as processed to prevent recursion
+      markRecordsAsProcessed();
     }
     
     // Set the maximum number of times the handler can run
@@ -179,10 +186,28 @@ public virtual class TriggerHandler {
     // Verify that the trigger should execute
     @TestVisible
     private Boolean validateRun() {
-      if(!this.isTriggerExecuting || this.context == null) {
+     /* if(!this.isTriggerExecuting || this.context == null) {
         throw new TriggerHandlerException('Trigger handler called outside of Trigger execution');
       }
       return !TriggerHandler.bypassedHandlers.contains(getHandlerName());
+      */
+      if (!this.isTriggerExecuting || this.context == null) {
+        throw new TriggerHandlerException('Trigger handler called outside of Trigger execution');
+    }
+
+    // Check if the handler is bypassed
+    if (TriggerHandler.bypassedHandlers.contains(getHandlerName())) {
+        return false;
+    }
+
+    // Check for recursion (avoid reprocessing the same records)
+    for (SObject record : getTriggerRecords()) {
+        if (record.Id != null && processedRecords.contains(record.Id)) {
+            return false; // Skip processing if already handled
+        }
+    }
+
+    return true;
     }
     
     // Get the name of the handler that's currently executing
@@ -190,7 +215,39 @@ public virtual class TriggerHandler {
     private String getHandlerName() {
       return String.valueOf(this).substring(0,String.valueOf(this).indexOf(':'));
     }
-    
+
+    // Get the trigger records based on the current context
+    @TestVisible
+    private List<SObject> getTriggerRecords() {
+        /*switch on this.context {
+            when BEFORE_INSERT, AFTER_INSERT, BEFORE_UPDATE, AFTER_UPDATE, AFTER_UNDELETE {
+                return Trigger.new;
+            }
+            when BEFORE_DELETE, AFTER_DELETE {
+                return Trigger.old;
+            }
+            otherwise {
+              return new List<SObject>();
+            }
+        }*/
+      // Ensure Trigger context is properly evaluated
+      if (Trigger.isInsert || Trigger.isUpdate || Trigger.isUndelete) {
+          return Trigger.new;
+      } else if (Trigger.isDelete) {
+          return Trigger.old;
+      } else {
+          return new List<SObject>();
+      }
+    }
+
+    //logic to mark records as processed after handling them:
+    private void markRecordsAsProcessed() {
+      for (SObject record : getTriggerRecords()) {
+          if (record.Id != null) {
+              processedRecords.add(record.Id);
+          }
+      }
+    }
     /***************************************
      * context methods
      ***************************************/
